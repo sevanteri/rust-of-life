@@ -1,0 +1,12 @@
+[package]
+name = "gameoflife"
+version = "0.1.0"
+authors = ["Pete Sevander <pete@sevander.com>"]
+
+[dependencies]
+piston = "*"
+piston2d-graphics = "*"
+pistoncore-glutin_window = "*"
+piston2d-opengl_graphics = "*"
+rand = "*"
+#num = "*"
