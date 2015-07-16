@@ -61,7 +61,7 @@ impl App {
         }
     }
 
-    pub fn resize(&mut self, args: &[u32; 2]) {
+    pub fn resize(&mut self, args: [u32; 2]) {
         self.width = args[0];
         self.height = args[1];
         self.resize_grid();
@@ -105,6 +105,14 @@ impl App {
                 self.resize_grid();
                 println!("Tilesize: {:.3}", self.grid.tilesize);
             },
+            Keyboard(Key::D1) => {
+                self.grid.zoom -= if self.grid.zoom == 1.0 { 0.0 } else { 0.1 };
+                println!("Zoom: {:.1}", self.grid.zoom);
+            },
+            Keyboard(Key::D2) => {
+                self.grid.zoom += 0.1;
+                println!("Zoom: {:.1}", self.grid.zoom);
+            },
             Keyboard(Key::R) => {
                 self.grid.randomize();
             },
@@ -134,8 +142,16 @@ impl App {
         }
     }
 
-    pub fn mouse_move(&mut self, args: &[f64; 2]) {
-        self.mouse = *args;
+    pub fn mouse_move(&mut self, args: [f64; 2]) {
+        self.mouse = args;
+        self.grid.offset = [
+            args[0] * (1.0 - self.grid.zoom),
+            args[1] * (1.0 - self.grid.zoom)
+        ];
         //println!("{:?}", self.mouse);
+    }
+
+    pub fn mouse_scroll(&mut self, args: [f64; 2]) {
+        println!("{:?}", args);
     }
 }

@@ -3,8 +3,6 @@ extern crate rand;
 use piston::event::*;
 use opengl_graphics::GlGraphics;
 
-use settings::*;
-
 use app::Mode;
 
 pub type Cell = bool;
@@ -16,6 +14,8 @@ pub struct Grid {
     pub width: usize,
     pub height: usize,
     pub tilesize: usize,
+    pub zoom: f64,
+    pub offset: [f64; 2],
     cells: Rows,
     buffer: Rows,
 }
@@ -26,6 +26,8 @@ impl Grid {
             width: width,
             height: height,
             tilesize: tilesize,
+            zoom: 1.0,
+            offset: [0.0, 0.0],
             cells: Grid::new_empty_cells(width, height),
             buffer: Grid::new_empty_cells(width, height),
             //cells: [[false; YTILES]; XTILES],
@@ -87,16 +89,19 @@ impl Grid {
     }
 
     pub fn render(&mut self, gl: &mut GlGraphics, args: &RenderArgs) {
-        for (x, xv) in self.cells.iter_mut().enumerate() {
-            for (y, yv) in xv.iter_mut().enumerate() {
-                yv.render(x, y, self.tilesize, gl, args); // 0 -> index, 1 -> cell
+        for (x, xv) in self.cells.iter().enumerate() {
+            for (y, yv) in xv.iter().enumerate() {
+                yv.render(x, y,
+                          &self,
+                          gl,
+                          args);
             }
         }
-        for (x, xv) in self.buffer.iter_mut().enumerate() {
-            for (y, yv) in xv.iter_mut().enumerate() {
-                yv.render_red(x, y, self.tilesize, gl, args); // 0 -> index, 1 -> cell
-            }
-        }
+        //for (x, xv) in self.buffer.iter_mut().enumerate() {
+            //for (y, yv) in xv.iter_mut().enumerate() {
+                //yv.render_red(x, y, self.tilesize, gl, args);
+            //}
+        //}
 
         self.draw_grid(gl, args);
     }
@@ -141,9 +146,9 @@ impl Grid {
             let g = grid::Grid {
                 rows: self.height as u32,
                 cols: self.width as u32,
-                units: self.tilesize as f64
+                units: self.tilesize as f64 * self.zoom
             };
-            g.draw(&line, &c.draw_state, c.transform, gl);
+            g.draw(&line, &c.draw_state, c.transform.trans(self.offset[0], self.offset[1]), gl);
         });
     }
 
@@ -178,8 +183,8 @@ impl Grid {
     }
 
     pub fn draw(&mut self, mouse: &[f64; 2], mode: &Mode) {
-        let x = (mouse[0] / self.tilesize as f64) as usize;
-        let y = (mouse[1] / self.tilesize as f64) as usize;
+        let x = ((mouse[0] - self.offset[0]) / self.tilesize as f64 / self.zoom) as usize;
+        let y = ((mouse[1] - self.offset[1]) / self.tilesize as f64 / self.zoom) as usize;
         //println!("{}, {}", x,y);
 
         match *mode {
@@ -192,12 +197,16 @@ impl Grid {
     }
 
     pub fn glider(&mut self, (x, y): (usize, usize)) {
-        // add modulo
+        let xp1 = Grid::m((x + 1) as isize, self.width as isize);
+        let xp2 = Grid::m((x + 2) as isize, self.width as isize);
+        let yp1 = Grid::m((y + 1) as isize, self.height as isize);
+        let yp2 = Grid::m((y + 2) as isize, self.height as isize);
+
         self.cells[x][y] = true;
-        self.cells[x + 2][y] = true;
-        self.cells[x + 2][y + 1] = true;
-        self.cells[x + 1][y + 1] = true;
-        self.cells[x + 1][y + 2] = true;
+        self.cells[xp2][y] = true;
+        self.cells[xp2][yp1] = true;
+        self.cells[xp1][yp1] = true;
+        self.cells[xp1][yp2] = true;
     }
 
     pub fn line(&mut self, (x, y): (usize, usize)) {
@@ -208,26 +217,26 @@ impl Grid {
 }
 
 trait Tile {
-    fn render(&mut self,
+    fn render(&self,
               x: usize,
               y: usize,
-              tilesize: usize,
+              grid: &Grid,
               gl: &mut GlGraphics,
               args: &RenderArgs);
-    fn render_red(&mut self,
+    fn render_red(&self,
                   x: usize,
                   y: usize,
-                  tilesize: usize,
+                  grid: &Grid,
                   gl: &mut GlGraphics,
                   args: &RenderArgs);
     fn toggle(&mut self);
 }
 
 impl Tile for Cell {
-    fn render(&mut self,
+    fn render(&self,
               x: usize,
               y: usize,
-              tilesize: usize,
+              grid: &Grid,
               gl: &mut GlGraphics,
               args: &RenderArgs)
     {
@@ -236,9 +245,9 @@ impl Tile for Cell {
         if !*self { return; }
 
         let square = rectangle::square(
-            (x * tilesize) as f64,
-            (y * tilesize) as f64,
-            tilesize as f64
+            ((x * grid.tilesize) as f64 * grid.zoom) + grid.offset[0],
+            ((y * grid.tilesize) as f64 * grid.zoom) + grid.offset[1],
+            grid.tilesize as f64 * grid.zoom
         );
 
         gl.draw(args.viewport(), |c, gl| {
@@ -246,10 +255,10 @@ impl Tile for Cell {
         });
     }
 
-    fn render_red(&mut self,
+    fn render_red(&self,
                   x: usize,
                   y: usize,
-                  tilesize: usize,
+                  grid: &Grid,
                   gl: &mut GlGraphics,
                   args: &RenderArgs)
     {
@@ -258,9 +267,9 @@ impl Tile for Cell {
         if !*self { return; }
 
         let square = rectangle::square(
-            (x * tilesize + tilesize/4) as f64,
-            (y * tilesize + tilesize/4) as f64,
-            (tilesize/2) as f64
+            (x * grid.tilesize + grid.tilesize/4) as f64,
+            (y * grid.tilesize + grid.tilesize/4) as f64,
+            (grid.tilesize/2) as f64
         );
 
         gl.draw(args.viewport(), |c, gl| {

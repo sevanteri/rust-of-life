@@ -39,24 +39,28 @@ fn main() {
     app.grid.glider((5,5));
 
     for e in win.events() {
+        if let Some(p) = e.press_args() {
+            app.key_press(&p);
+        }
+
+        if let Some(m) = e.mouse_scroll_args() {
+            app.mouse_scroll(m);
+        }
+
+        if let Some(m) = e.mouse_cursor_args() {
+            app.mouse_move(m);
+        }
+
+        if let Some(r) = e.resize_args() {
+            app.resize(r);
+        }
+
         if let Some(r) = e.render_args() {
             app.render(&r);
         }
 
         if let Some(u) = e.update_args() {
             app.update(&u);
-        }
-
-        if let Some(p) = e.press_args() {
-            app.key_press(&p);
-        }
-
-        if let Some(m) = e.mouse_cursor_args() {
-            app.mouse_move(&m);
-        }
-
-        if let Some(r) = e.resize_args() {
-            app.resize(&r);
         }
     }
 
